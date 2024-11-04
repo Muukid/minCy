@@ -11,6 +11,7 @@
 #include <inttypes.h>
 
 CyChunkedFile file;
+muBool shouldInsert = MU_FALSE;
 
 void printFileInfo(void) {
 	CyLog("\nInfo:\n");
@@ -21,21 +22,27 @@ void printFileInfo(void) {
 		// Print chunk data
 		for (uint32_m i = 0; i < FILE_CHUNK_CODEPOINTS; ++i) {
 			if (chunks == file.cursorChunk && file.cursorIndex == i) {
-				printf("%c[4;42m", 27);
-				switch (chunks->data[i]) {
-					default: CyLog("%c", (char)chunks->data[i]); break;
-					case 0: CyLog("_"); break;
-					case 13: CyLog("|"); break;
-				}
-				printf("%c[0m", 27);
+				CyLog("%c[4;42m", 27);
 			}
-			else {
-				switch (chunks->data[i]) {
-					default: CyLog("%c", (char)chunks->data[i]); break;
-					case 0: CyLog("_"); break;
-					case 13: CyLog("|"); break;
-				}
+
+			switch (chunks->data[i]) {
+				default: CyLog("%c ", (char)chunks->data[i]); break;
+
+				case 0: {
+					if (chunks == file.cursorChunk && file.cursorIndex == i) {
+						CyLog("%c[4;43m", 27);
+						CyLog("_ ");
+					} else {
+						CyLog("%c[4;41m", 27);
+						CyLog("_ ");
+					}
+				} break;
+
+				case 13: CyLog("\\n"); break;
+				case 9: CyLog("\\t"); break;
 			}
+
+			CyLog("%c[0m", 27);
 		}
 		CyLog("\n");
 
@@ -54,21 +61,33 @@ void printFileInfo(void) {
 		// Print chunk data
 		for (uint32_m i = 0; i < FILE_CHUNK_CODEPOINTS; ++i) {
 			if (chunks == file.cursorChunk && file.cursorIndex == i) {
-				printf("%c[4;42m", 27);
-				switch (chunks->data[i]) {
-					default: CyLog("%c", (char)chunks->data[i]); break;
-					case 0: printf(" "); break;
-					case 13: CyLog("|"); break;
-				}
-				printf("%c[0m", 27);
+				CyLog("%c[4;42m", 27);
 			}
-			else {
-				switch (chunks->data[i]) {
-					default: CyLog("%c", (char)chunks->data[i]); break;
-					case 0: break;
-					case 13: CyLog("|"); break;
-				}
+
+			switch (chunks->data[i]) {
+				default: CyLog("%c", (char)chunks->data[i]); break;
+
+				case 0: {
+					if (chunks == file.cursorChunk && file.cursorIndex == i) {
+						CyLog(" ");
+					} else {
+						CyLog("");
+					}
+				} break;
+
+				case 13: {
+					CyLog(" ");
+					CyLog("%c[0m", 27);
+					CyLog("\n");
+				} break;
+
+				case 9: {
+					// Note: this code assumes that a tab is 5 spaces visually
+					CyLog("     ");
+				} break;
 			}
+
+			CyLog("%c[0m", 27);
 		}
 
 		// Exit loop if no more chunks found
@@ -94,18 +113,23 @@ void textInputCallback(muWindow win, uint8_m* data) {
 			}
 		} break;
 
-		/*case 8: {
+		case 8: {
 			CyLog("Backspace noted; writing a backspace...\n");
-			CyWriteBackspaceToChunkedFile(&file);
+			CyBackspaceCodepointInChunkedFile(&file);
 			printFileInfo();
 			return;
-		} break;*/
+		} break;
 
-		case 13: break;
+		case 13: case 9: break;
 	}
 
-	CyLog("Writing codepoint to file...\n");
-	CyInsertCodepointInChunkedFile(&file, codepoint);
+	if (shouldInsert) {
+		CyLog("Inserting codepoint to file...\n");
+		CyInsertCodepointInChunkedFile(&file, codepoint);
+	} else {
+		CyLog("Writing codepoint to file...\n");
+		CyWriteCodepointInChunkedFile(&file, codepoint);
+	}
 	printFileInfo();
 }
 
@@ -123,6 +147,14 @@ void keyInputCallback(muWindow win, muKeyboardKey key, muBool status) {
 		CyLog("Rightward movement detected; moving cursor.\n");
 		CyMoveRightInChunkedFile(&file, 1);
 		printFileInfo();
+	}
+	else if (key == MU_KEYBOARD_INSERT) {
+		shouldInsert = !shouldInsert;
+		if (shouldInsert) {
+			CyLog("Insert mode ON\n");
+		} else {
+			CyLog("Insert mode OFF\n");
+		}
 	}
 }
 

@@ -11,6 +11,7 @@
 #include <inttypes.h>
 
 CyChunkedFile file;
+muBool shouldInsert = MU_FALSE;
 
 void printFileInfo(void) {
 	CyLog("\nInfo:\n");
@@ -122,8 +123,13 @@ void textInputCallback(muWindow win, uint8_m* data) {
 		case 13: case 9: break;
 	}
 
-	CyLog("Writing codepoint to file...\n");
-	CyInsertCodepointInChunkedFile(&file, codepoint);
+	if (shouldInsert) {
+		CyLog("Inserting codepoint to file...\n");
+		CyInsertCodepointInChunkedFile(&file, codepoint);
+	} else {
+		CyLog("Writing codepoint to file...\n");
+		CyWriteCodepointInChunkedFile(&file, codepoint);
+	}
 	printFileInfo();
 }
 
@@ -141,6 +147,14 @@ void keyInputCallback(muWindow win, muKeyboardKey key, muBool status) {
 		CyLog("Rightward movement detected; moving cursor.\n");
 		CyMoveRightInChunkedFile(&file, 1);
 		printFileInfo();
+	}
+	else if (key == MU_KEYBOARD_INSERT) {
+		shouldInsert = !shouldInsert;
+		if (shouldInsert) {
+			CyLog("Insert mode ON\n");
+		} else {
+			CyLog("Insert mode OFF\n");
+		}
 	}
 }
 

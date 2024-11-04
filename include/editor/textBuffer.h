@@ -47,4 +47,6 @@ void CyMoveRightInChunkedFile(CyChunkedFile* file, uint32_m n);
 muBool CyInsertCodepointInChunkedFile(CyChunkedFile* file, uint32_m codepoint);
 // Backspace a codepoint
 void CyBackspaceCodepointInChunkedFile(CyChunkedFile* file);
+// Writes codepoint
+muBool CyWriteCodepointInChunkedFile(CyChunkedFile* file, uint32_m codepoint);
 
