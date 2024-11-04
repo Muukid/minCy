@@ -45,3 +45,6 @@ void CyMoveRightInChunkedFile(CyChunkedFile* file, uint32_m n);
 
 // Inserts codepoint
 muBool CyInsertCodepointInChunkedFile(CyChunkedFile* file, uint32_m codepoint);
+// Backspace a codepoint
+void CyBackspaceCodepointInChunkedFile(CyChunkedFile* file);
+
