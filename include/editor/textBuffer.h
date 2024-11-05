@@ -17,6 +17,17 @@ struct CyFileChunk {
 	CyFileChunk* prev;
 };
 
+// Struct representing an individual slot in a chunk
+struct CyChunkSlot {
+	// Codepoint of the slot
+	uint32_m codepoint;
+	// Chunk
+	CyFileChunk* chunk;
+	// Index
+	uint32_m index;
+};
+typedef struct CyChunkSlot CyChunkSlot;
+
 // Struct representing a chunked file
 struct CyChunkedFile {
 	// Chunks
@@ -49,4 +60,11 @@ muBool CyInsertCodepointInChunkedFile(CyChunkedFile* file, uint32_m codepoint);
 void CyBackspaceCodepointInChunkedFile(CyChunkedFile* file);
 // Writes codepoint
 muBool CyWriteCodepointInChunkedFile(CyChunkedFile* file, uint32_m codepoint);
+
+// Gets the first slot
+// Returns false if no slot
+muBool CyGetFirstSlotInChunkedFile(CyChunkedFile* file, CyChunkSlot* slot);
+// Gets the next slot
+// Returns false if no slot
+muBool CyGetNextSlotInChunkedFile(CyChunkSlot* slot);
 

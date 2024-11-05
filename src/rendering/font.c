@@ -1,6 +1,8 @@
 // font.c
 // Handles loading a font and making textures for it
 
+// @TODO Clean up!!!
+
 #include "rendering/font.h"
 #include "libs/libs.h"
 #include "core/log.h"
@@ -136,11 +138,27 @@ void CySetFontPointSize(CyFont* font, float pointSize) {
 	font->layerDim[1] = ceil(mutt_funits_to_punits(&font->font, font->font.head->y_max - font->font.head->y_min, pointSize, PPI)) + 2;
 
 	// Pixel-unit info
+
 	font->pAdvanceWidth = mutt_funits_to_punits(&font->font, font->advanceWidth, pointSize, PPI);
 	font->pAscender = mutt_funits_to_punits(&font->font, font->font.hhea->ascender, pointSize, PPI);
 	font->pDescender = mutt_funits_to_punits(&font->font, font->font.hhea->descender, pointSize, PPI);
 	font->pLineGap = mutt_funits_to_punits(&font->font, font->font.hhea->line_gap, pointSize, PPI);
 	font->pHeight = fabs((font->pAscender - font->pDescender) + fabs(font->pLineGap));
+
+	font->pMaxWidth = fabs(
+		mutt_funits_to_punits(&font->font, font->font.head->x_max, pointSize, PPI)
+		-
+		mutt_funits_to_punits(&font->font, font->font.head->x_min, pointSize, PPI)
+	);
+	font->pMaxHeight = fabs(
+		mutt_funits_to_punits(&font->font, font->font.head->y_max, pointSize, PPI)
+		-
+		mutt_funits_to_punits(&font->font, font->font.head->y_min, pointSize, PPI)
+	);
+
+	// Ceiling pixel-unit info
+	font->uAdvanceWidth = ceil(font->pAdvanceWidth);
+	font->uHeight = ceil(font->pHeight);
 }
 
 // Loads a codepoint into a font range
@@ -163,13 +181,13 @@ muBool CyFontLoadCodepoint(CyFont* font, uint32_m codepoint) {
 	CyLog("Rasterizing codepoints within range...\n");
 
 	// Allocate pixels
-	muByte* pixels = (muByte*)malloc(font->layerDim[0] * font->layerDim[1] * FONT_LAYERS);
+	muByte* pixels = (muByte*)malloc(font->layerDim[0] * font->layerDim[1] * FONT_LAYERS * 4);
 	if (!pixels) {
 		CyLog("Failed to allocate pixels\n");
 		font->numTextures--;
 		return MU_FALSE;
 	}
-	memset(pixels, 0, font->layerDim[0] * font->layerDim[1] * FONT_LAYERS);
+	memset(pixels, 0, font->layerDim[0] * font->layerDim[1] * FONT_LAYERS * 4);
 	// Describe bitmap
 	muttRBitmap bitmap;
 	bitmap.width = font->layerDim[0];
@@ -197,6 +215,7 @@ muBool CyFontLoadCodepoint(CyFont* font, uint32_m codepoint) {
 			bitmap.pixels += bitmap.stride * bitmap.height;
 			continue;
 		}
+
 		// Load rglyph
 		muttRGlyph rglyph;
 		mutt_res = mutt_header_rglyph(&font->font, &header, &rglyph, font->pointSize, PPI, font->rdata, 0);
@@ -205,6 +224,7 @@ muBool CyFontLoadCodepoint(CyFont* font, uint32_m codepoint) {
 			bitmap.pixels += bitmap.stride * bitmap.height;
 			continue;
 		}
+
 		// Rasterize
 		mutt_res = mutt_raster_glyph(&rglyph, &bitmap, FONT_RENDER_METHOD);
 		if (mutt_result_is_fatal(mutt_res)) {
@@ -234,8 +254,8 @@ muBool CyFontLoadCodepoint(CyFont* font, uint32_m codepoint) {
 
 // Checks if the given codepoint has been loaded into a font
 // Sets layer if found
-muBool CyFontIsCodepointLoaded(CyFont* font, uint32_m codepoint, uint8_m* texture, uint8_m* layer) {
-	for (uint8_m i = 0; i < font->numTextures; ++i) {
+muBool CyFontIsCodepointLoaded(CyFont* font, uint32_m codepoint, uint16_m* texture, uint16_m* layer) {
+	for (uint16_m i = 0; i < font->numTextures; ++i) {
 		if (codepoint >= font->textureStartCodes[i] && codepoint <= (font->textureStartCodes[i] + FONT_LAYERS)) {
 			if (texture) {
 				*texture = i;
@@ -251,8 +271,8 @@ muBool CyFontIsCodepointLoaded(CyFont* font, uint32_m codepoint, uint8_m* textur
 
 // Gets the texture and layer of a codepoint
 // Defaults on missing character
-void CyFontGetTexture(CyFont* font, uint32_m codepoint, uint8_m* texture, uint8_m* layer) {
-	for (uint8_m i = 0; i < font->numTextures; ++i) {
+void CyFontGetTexture(CyFont* font, uint32_m codepoint, uint16_m* texture, uint16_m* layer) {
+	for (uint16_m i = 0; i < font->numTextures; ++i) {
 		if (codepoint >= font->textureStartCodes[i] && codepoint <= (font->textureStartCodes[i] + FONT_LAYERS)) {
 			*texture = i;
 			*layer = codepoint - font->textureStartCodes[i];

@@ -25,13 +25,13 @@
 		} else if (!textFont.monospace) {
 			CyLog("Text font isn't monospace; exiting\n");
 			CyExit();
-		} else if (!CyFontLoadCodepoint(&textFont, 0x20)) {
+		}/* else if (!CyFontLoadCodepoint(&textFont, 0x20)) {
 			CyLog("Failed to load space character; exiting\n");
 			CyExit();
 		} else if (!CyFontIsCodepointLoaded(&textFont, 0x25A1, 0, 0) && !CyFontLoadCodepoint(&textFont, 0x25A1)) {
 			CyLog("Failed to load missing character; exiting\n");
 			CyExit();
-		} else {
+		}*/ else {
 			CyLog("Loaded text font\n");
 		}
 

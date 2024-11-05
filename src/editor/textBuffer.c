@@ -495,3 +495,54 @@
 		return MU_TRUE;
 	}
 
+	// Gets the first slot
+	// Returns false if no slot
+	muBool CyGetFirstSlotInChunkedFile(CyChunkedFile* file, CyChunkSlot* slot) {
+		slot->index = 0;
+		slot->chunk = file->chunks;
+
+		while (MU_TRUE) {
+			if (slot->chunk->data[slot->index] != 0) {
+				slot->codepoint = slot->chunk->data[slot->index];
+				return MU_TRUE;
+			}
+
+			if (slot->index == FILE_CHUNK_CODEPOINTS-1 && !slot->chunk->next) {
+				return MU_FALSE;
+			}
+			else if (slot->index == FILE_CHUNK_CODEPOINTS-1) {
+				slot->chunk = slot->chunk->next;
+				slot->index = 0;
+			}
+			else {
+				++slot->index;
+			}
+		}
+
+		return MU_TRUE;
+	}
+
+	// Gets the next slot
+	// Returns false if no slot
+	muBool CyGetNextSlotInChunkedFile(CyChunkSlot* slot) {
+		while (MU_TRUE) {
+			if (slot->index == FILE_CHUNK_CODEPOINTS-1 && !slot->chunk->next) {
+				return MU_FALSE;
+			}
+			else if (slot->index == FILE_CHUNK_CODEPOINTS-1) {
+				slot->chunk = slot->chunk->next;
+				slot->index = 0;
+			}
+			else {
+				++slot->index;
+			}
+
+			if (slot->chunk->data[slot->index] != 0) {
+				slot->codepoint = slot->chunk->data[slot->index];
+				return MU_TRUE;
+			}
+		}
+
+		return MU_FALSE;
+	}
+
