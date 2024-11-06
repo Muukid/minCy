@@ -14,6 +14,8 @@ struct CyEditorBoxSlot {
 	uint16_m texture;
 	// Layer index for the texture
 	uint16_m layer;
+	// Codepoint
+	uint32_m codepoint;
 };
 typedef struct CyEditorBoxSlot CyEditorBoxSlot;
 

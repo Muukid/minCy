@@ -9,8 +9,6 @@
 // after calling a function, unless there are no codepoints
 // after it.
 
-// @TODO Clean up code.
-
 #include "editor/textBuffer.h"
 #include <string.h>
 #include <stdlib.h>
@@ -58,58 +56,6 @@
 				else {
 					++file->cursorIndex;
 				}
-				return;
-			}
-		}
-	}
-	// Pushes cursor to farthest left non-empty slot
-	// Similar to CyShiftLeft
-	void CyShiftLeftNonEmpty(CyChunkedFile* file) {
-		while (MU_TRUE) {
-			// If we've gone as far left as possible, just exit
-			if (!file->cursorChunk->prev && file->cursorIndex == 0) {
-				return;
-			}
-
-			// If we've gone as far left as possible in this chunk, wrap
-			if (file->cursorIndex == 0) {
-				file->cursorChunk = file->cursorChunk->prev;
-				file->cursorIndex = FILE_CHUNK_CODEPOINTS-1;
-			}
-
-			// If not, simply decrement cursorIndex
-			else {
-				--file->cursorIndex;
-			}
-
-			// If this codepoint is not 0, we're good
-			if (file->cursorChunk->data[file->cursorIndex] != 0) {
-				return;
-			}
-		}
-	}
-
-	// Pushes cursor to farthest right non-empty slot
-	void CyShiftRightNonEmpty(CyChunkedFile* file) {
-		while (MU_TRUE) {
-			// If we've gone as far right as possible, just exit
-			if (!file->cursorChunk->next && file->cursorIndex == FILE_CHUNK_CODEPOINTS-1) {
-				return;
-			}
-
-			// If we've gone as far right as possible in this chunk, wrap
-			if (file->cursorIndex == FILE_CHUNK_CODEPOINTS-1) {
-				file->cursorChunk = file->cursorChunk->next;
-				file->cursorIndex = 0;
-			}
-
-			// If not, simply increment cursorIndex
-			else {
-				++file->cursorIndex;
-			}
-
-			// If this codepoint is not 0, we're good
-			if (file->cursorChunk->data[file->cursorIndex] != 0) {
 				return;
 			}
 		}
@@ -355,12 +301,12 @@
 
 	// Backspace a codepoint
 	void CyBackspaceCodepointInChunkedFile(CyChunkedFile* file) {
-		// 1. Save where we currently are.
+		// Save where we currently are.
 		CyFileChunk* prevChunk = file->cursorChunk;
 		uint32_m prevIndex = file->cursorIndex;
 
-		// 2. Move left until we're rather farthest left possible
-		//    or we're on a non-zero codepoint.
+		// Move left until we're rather farthest left possible
+		// or we're on a non-zero codepoint.
 		while (MU_TRUE) {
 			if (!file->cursorChunk->prev && file->cursorIndex == 0) {
 				break;
@@ -480,16 +426,13 @@
 		}
 
 		// There is no previous spot.
-		// So, a few things need to happen:
-
-		// 1. Push right.
+		// Push right.
 		if (!CyPushRight(file)) {
 			return MU_FALSE;
 		}
-
-		// 2. Set codepoint.
+		// Set codepoint.
 		file->cursorChunk->data[file->cursorIndex] = codepoint;
-		// 3. Move cursor right.
+		// Move cursor right.
 		CyMoveRightInChunkedFile(file, 1);
 
 		return MU_TRUE;

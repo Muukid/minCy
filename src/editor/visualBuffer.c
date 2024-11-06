@@ -9,8 +9,39 @@
 
 /* Inner */
 
+	// Sets proper offsets for a given codepoint slot
+	void CyOffsetCodepoint(CyEditorBox* box, mug2DTextureArrayRect* rect, uint32_m codepoint, float mult, uint32_m i) {
+		// Get glyph header
+		uint16_m glyphID = CyFontGetGlyphID(box->font, codepoint);
+		muttGlyphHeader header;
+		if (mutt_result_is_fatal(mutt_glyph_header(&box->font->font, glyphID, &header))) {
+			return;
+		}
+
+		// Calculate column and row
+		int32_m r = (i / box->textDim[0]);
+		int32_m c = i - (r * box->textDim[0]);
+
+		// Get rglyph metrics
+		muttRGlyph rglyph;
+		mutt_rglyph_metrics(&box->font->font, &header, glyphID, &rglyph, box->font->pointSize, PPI);
+		mutt_funits_punits_min_max(&box->font->font, &header, &rglyph, box->font->pointSize, PPI);
+
+		// Offset x-value by lsb
+		rect->center.pos[0] = (((float)c) * box->font->pAdvanceWidth) + (box->font->layerDim[0] * 0.5f);
+		rect->center.pos[0] += rglyph.lsb * mult;
+		rect->center.pos[0] = roundf(rect->center.pos[0]) + .5f;
+		// Offset y-value by this magic thing that works
+		rect->center.pos[1] = (((float)r) * box->font->pHeight) - (box->font->layerDim[1] * 0.5f);
+		rect->center.pos[1] += ((rglyph.ascender * 2.f) - rglyph.descender) * mult;
+		rect->center.pos[1] = roundf(rect->center.pos[1]);
+	}
+
 	// Sets a codepoint given index
 	void CySetCodepoint(CyEditorBox* box, uint32_m i, uint32_m codepoint) {
+		// De-offset codepoint offsets
+		CyOffsetCodepoint(box, &box->textRects[i], box->slots[i].codepoint, -1.f, i);
+
 		// Get texture and layer for codepoint
 		uint16_m texture, layer;
 		CyFontGetTexture(box->font, codepoint, &texture, &layer);
@@ -19,6 +50,95 @@
 		box->textRects[i].tex_pos[2] = layer;
 		box->slots[i].texture = texture;
 		box->slots[i].layer = layer;
+		box->slots[i].codepoint = codepoint;
+
+		// Offset codepoint
+		CyOffsetCodepoint(box, &box->textRects[i], codepoint, 1.f, i);
+	}
+
+	// Calculates the default info of a texture rect
+	void CyDefaultTextureCodepoint(CyEditorBox* box, uint32_m c, uint32_m r, uint32_m i, uint32_m layer) {
+		mug2DTextureArrayRect* rect = &box->textRects[i];
+
+		// Z-value:
+		rect->center.pos[2] =
+			// Percentage of way through numRects
+			((((float)i) / ((float)box->numRects))
+			// Half it and add half to make it range 0.5 to 1.0
+			* 0.5f) + 0.5f
+		;
+
+		// Offset value for space
+		CyOffsetCodepoint(box, rect, 0x20, 1.f, i);
+
+		// Color
+		rect->center.col[0] = rect->center.col[1] =
+		rect->center.col[2] = rect->center.col[3] = 1.f;
+		// Dimensions
+		rect->dim[0] = box->font->layerDim[0];
+		rect->dim[1] = box->font->layerDim[1];
+
+		// Rotation
+		rect->rot = 0.f;
+
+		// Cut-out
+		rect->tex_pos[0] = rect->tex_pos[1] = 0.f;
+		rect->tex_pos[2] = layer;
+		rect->tex_dim[0] = rect->tex_dim[1] = 1.f;
+	}
+
+	// Calculates the default info of a color rect
+	void CyDefaultColorCodepoint(CyEditorBox* box, uint32_m c, uint32_m r, uint32_m i) {
+		mugRect* rect = &box->colRects[i];
+
+		// X-value:
+		rect->center.pos[0] =
+			// Offset center to generally where slot is on the X
+			(((float)c) * box->font->pAdvanceWidth)
+			// Offset by half dimensions to account for position being center of rect
+			+ (box->font->pAdvanceWidth * 0.5f)
+		;
+
+		// Y-value:
+		rect->center.pos[1] =
+			// Offset center to generally where slot is on the Y
+			(((float)r) * box->font->pHeight)
+			// Offset by half dimensions to account for position being center of rect
+			+ (box->font->pHeight * 0.5f)
+		;
+
+		// Z-value:
+		rect->center.pos[2] =
+			// Percentage of way through numRects
+			(((float)i) / ((float)box->numRects))
+			// Half it to make it range 0.0 to 0.5
+			* 0.5f
+		;
+
+		// Color:
+		rect->center.col[0] = rect->center.col[1] =
+		rect->center.col[2] = 0.f;
+		rect->center.col[3] = 1.f;
+
+		// Dimensions:
+		rect->dim[0] = box->font->pAdvanceWidth;
+		rect->dim[1] = box->font->pHeight;
+
+		// Rotation:
+		rect->rot = 0.f;
+	}
+
+	// Sets default codepoint information
+	void CySetDefaultCodepoint(CyEditorBox* box, uint32_m c, uint32_m r, uint16_m texture, uint16_m layer) {
+		uint32_m i = (r * box->textDim[0]) + c;
+		CyEditorBoxSlot* slot = &box->slots[i];
+
+		// Set default info
+		CyDefaultTextureCodepoint(box, c, r, i, layer);
+		CyDefaultColorCodepoint(box, c, r, i);
+		slot->texture = texture;
+		slot->layer = layer;
+		slot->codepoint = 0x20;
 	}
 
 /* Outer */
@@ -36,8 +156,8 @@
 		}
 
 		// Set dimensions of text box
-		box->textDim[0] = floor(max_width / font->uAdvanceWidth);
-		box->textDim[1] = floor(max_height / font->uHeight);
+		box->textDim[0] = floor(max_width / font->pAdvanceWidth);
+		box->textDim[1] = floor(max_height / font->pHeight);
 		box->numRects = box->textDim[0] * box->textDim[1];
 
 		// Allocate textRects, colRects, and slots
@@ -76,47 +196,7 @@
 		// Loop through each column and row
 		for (uint32_m c = 0; c < box->textDim[0]; ++c) {
 			for (uint32_m r = 0; r < box->textDim[1]; ++r) {
-				uint32_m i = (r * box->textDim[0]) + c;
-
-				// Set positions
-				// - X
-				box->textRects[i].center.pos[0] = (float)(c * font->uAdvanceWidth) + (font->layerDim[0] * 0.5f);
-				box->colRects[i].center.pos[0] = (float)(c * font->uAdvanceWidth) + (((float)font->uAdvanceWidth) * 0.5f);
-				// - Y
-				box->textRects[i].center.pos[1] = (float)(r * font->uHeight) + (font->layerDim[1] * 0.5f) - font->uHeight;
-				box->colRects[i].center.pos[1] = (float)(r * font->uHeight) + (((float)font->uHeight) * 0.5f);
-				// - Z
-				box->textRects[i].center.pos[2] = ((((float)i) / ((float)box->numRects)) * 0.5f) + 0.5f;
-				box->colRects[i].center.pos[2] = ((((float)i) / ((float)box->numRects)) * 0.5f);
-
-				// Set color
-				// - Texture RGBA
-				box->textRects[i].center.col[0] = box->textRects[i].center.col[1] =
-				box->textRects[i].center.col[2] = box->textRects[i].center.col[3] = 1.f;
-				// - Color RGBA
-				box->colRects[i].center.col[0] = box->colRects[i].center.col[1] = box->colRects[i].center.col[2] = 0.f;
-				box->colRects[i].center.col[3] = 1.f;
-
-				// Set dimensions
-				// - Texture
-				box->textRects[i].dim[0] = font->layerDim[0];
-				box->textRects[i].dim[1] = font->layerDim[1];
-				// - Color
-				box->colRects[i].dim[0] = font->uAdvanceWidth;
-				box->colRects[i].dim[1] = font->uHeight;
-
-				// Set rotation
-				box->textRects[i].rot = 
-				box->colRects[i].rot = 0.f;
-
-				// Set texture cut-out
-				box->textRects[i].tex_pos[0] = box->textRects[i].tex_pos[1] = 0.f;
-				box->textRects[i].tex_pos[2] = space_layer;
-				box->textRects[i].tex_dim[0] = box->textRects[i].tex_dim[1] = 1.f;
-
-				// Set slot to space
-				box->slots[i].texture = space_texture;
-				box->slots[i].layer = space_layer;
+				CySetDefaultCodepoint(box, c, r, space_texture, space_layer);
 			}
 		}
 
@@ -187,18 +267,23 @@
 		CyChunkSlot chunkSlot;
 		muBool moreCodepoints = CyGetFirstSlotInChunkedFile(&box->file, &chunkSlot);
 
+		// Loop through each slot
 		for (uint32_m i = 0; i < box->numRects; ++i) {
+			// Set to just space if no more codepoints exist in the chunked file
 			if (!moreCodepoints) {
 				CySetCodepoint(box, i, 0x20);
 				continue;
 			}
 
+			// Set corresponding chunked file codepoint
 			// @TODO Newline and tab stuff here
 			CySetCodepoint(box, i, chunkSlot.codepoint);
 
+			// Get next chunked file codepoint
 			moreCodepoints = CyGetNextSlotInChunkedFile(&chunkSlot);
 		}
 
+		// Refill texture buffer
 		mu_gobjects_fill(gfx, box->textRectBuf, box->textRects);
 	}
 

@@ -41,11 +41,6 @@ struct CyFont {
 	float pDescender;
 	float pLineGap;
 	float pHeight; // abs((ascender - descender) + abs(line gap))
-	float pMaxWidth; // abs(x_max - x_min)
-	float pMaxHeight; // abs(y_max - y_min)
-	// Ceiling pixel-unit info
-	uint32_m uAdvanceWidth;
-	uint32_m uHeight;
 };
 typedef struct CyFont CyFont;
 
@@ -72,4 +67,8 @@ muBool CyFontIsCodepointLoaded(CyFont* font, uint32_m codepoint, uint16_m* textu
 // Gets the texture and layer of a codepoint
 // Defaults on missing character
 void CyFontGetTexture(CyFont* font, uint32_m codepoint, uint16_m* texture, uint16_m* layer);
+
+// Gets a codepoint from a font
+// Defaults on missing
+uint16_m CyFontGetGlyphID(CyFont* font, uint32_m codepoint);
 
