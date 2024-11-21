@@ -32,7 +32,7 @@
 		rect->center.pos[0] += rglyph.lsb * mult;
 		rect->center.pos[0] = roundf(rect->center.pos[0]) + .5f;
 		// Offset y-value by this magic thing that works
-		rect->center.pos[1] = (((float)r) * box->font->pHeight) - (box->font->layerDim[1] * 0.5f);
+		rect->center.pos[1] = (((float)(r-1)) * roundf(box->font->pHeight)) - (box->font->layerDim[1] * 0.5f);
 		rect->center.pos[1] += ((rglyph.ascender * 2.f) - rglyph.descender) * mult;
 		rect->center.pos[1] = roundf(rect->center.pos[1]);
 	}
@@ -141,6 +141,51 @@
 		slot->codepoint = 0x20;
 	}
 
+	// Sets info for cursor
+	muBool CySetDefaultCursor(CyEditorBox* box, uint32_m column, uint32_m row) {
+		// Rect dimensions
+		box->cursorRect.dim[0] = box->cursorWidth;
+		box->cursorRect.dim[1] = box->font->pHeight;
+
+		// Rect position
+		box->cursorRect.center.pos[0] = (box->font->pAdvanceWidth * column) + (box->cursorRect.dim[0] / 2.f);
+		box->cursorRect.center.pos[1] = (box->font->pHeight * row) + (box->cursorRect.dim[1] / 2.f);
+		box->cursorRect.center.pos[2] = 1.f;
+
+		// Rect color
+		box->cursorRect.center.col[0] = box->cursorRect.center.col[1] =
+		box->cursorRect.center.col[2] = box->cursorRect.center.col[3] = 1.f;
+
+		// Rect rotation
+		box->cursorRect.rot = 0.f;
+
+		// If buffer exists, simply refill and exit
+		if (box->cursorRectBuf) {
+			mu_gobjects_fill(gfx, box->cursorRectBuf, &box->cursorRect);
+			return MU_TRUE;
+		}
+
+		// If it doesn't, needs to be created
+		box->cursorRectBuf = mu_gobjects_create(gfx, MUG_OBJECT_RECT, 1, &box->cursorRect);
+		if (!box->cursorRectBuf) {
+			return MU_FALSE;
+		}
+
+		return MU_TRUE;
+	}
+
+	// Destroys the cursor
+	void CyDestroyCursor(CyEditorBox* box) {
+		// Destroy buffer
+		mu_gobjects_destroy(gfx, box->cursorRectBuf);
+	}
+
+	// Renders the cursor
+	void CyRenderCursor(CyEditorBox* box) {
+		// Render the buffer
+		mu_gobjects_render(gfx, box->cursorRectBuf);
+	}
+
 /* Outer */
 
 	// Initializes a text box
@@ -152,6 +197,15 @@
 		box->font = font;
 		if (!CyCreateEmptyChunkedFile(&box->file)) {
 			CyLog("Failed to allocate chunked file\n");
+			return MU_FALSE;
+		}
+
+		// Initialize cursor
+		box->cursorWidth = 0.1f * box->font->pAdvanceWidth;
+		box->cursorRectBuf = 0;
+		if (!CySetDefaultCursor(box, 0, 0)) {
+			CyLog("Failed to create buffer for cursor\n");
+			CyDestroyChunkedFile(&box->file);
 			return MU_FALSE;
 		}
 
@@ -167,6 +221,7 @@
 		if (!box->textRects) {
 			CyLog("Failed to allocate texture rects\n");
 			CyDestroyChunkedFile(&box->file);
+			CyDestroyCursor(box);
 			return MU_FALSE;
 		}
 
@@ -175,6 +230,7 @@
 			CyLog("Failed to allocate color rects\n");
 			free(box->textRects);
 			CyDestroyChunkedFile(&box->file);
+			CyDestroyCursor(box);
 			return MU_FALSE;
 		}
 
@@ -184,6 +240,7 @@
 			free(box->colRects);
 			free(box->textRects);
 			CyDestroyChunkedFile(&box->file);
+			CyDestroyCursor(box);
 			return MU_FALSE;
 		}
 
@@ -210,6 +267,7 @@
 			free(box->colRects);
 			free(box->textRects);
 			CyDestroyChunkedFile(&box->file);
+			CyDestroyCursor(box);
 		}
 
 		box->colRectBuf = mu_gobjects_create(gfx, MUG_OBJECT_RECT, box->numRects, box->colRects);
@@ -220,6 +278,7 @@
 			free(box->colRects);
 			free(box->textRects);
 			CyDestroyChunkedFile(&box->file);
+			CyDestroyCursor(box);
 		}
 
 		CyLog("\n");
@@ -232,6 +291,7 @@
 		CyLog("Destroying graphical buffers...\n");
 		mu_gobjects_destroy(gfx, box->colRectBuf);
 		mu_gobjects_destroy(gfx, box->textRectBuf);
+		CyDestroyCursor(box);
 
 		CyLog("Deallocating visual and informational slot information...\n");
 		free(box->slots);
@@ -246,6 +306,8 @@
 	void CyRenderEditorBox(CyEditorBox* box) {
 		// Render background rects
 		mu_gobjects_render(gfx, box->colRectBuf);
+		// Render cursor
+		CyRenderCursor(box);
 
 		// Render spans of slots with the same texture
 		uint32_m prev_i = 0;
@@ -264,8 +326,13 @@
 
 	// Refreshes the editor box to represent the chunked file
 	void CyRefreshEditorBox(CyEditorBox* box) {
+		// Get first slot
 		CyChunkSlot chunkSlot;
 		muBool moreCodepoints = CyGetFirstSlotInChunkedFile(&box->file, &chunkSlot);
+		// If this is where the cursor is, update accordingly
+		if (CyIsSlotAtCursor(&box->file, &chunkSlot)) {
+			CySetDefaultCursor(box, 0, 0);
+		}
 
 		// Loop through each slot
 		for (uint32_m i = 0; i < box->numRects; ++i) {
@@ -275,12 +342,44 @@
 				continue;
 			}
 
-			// Set corresponding chunked file codepoint
-			// @TODO Newline and tab stuff here
-			CySetCodepoint(box, i, chunkSlot.codepoint);
+			// i-value relative to row
+			uint32_m rowI = i - ((floor(((float)i) / ((float)box->textDim[0])) * box->textDim[0]));
+
+			// Newline handling
+			if (chunkSlot.codepoint == 0x0D) {
+				// Set all other columns to 0
+				uint32_m nextI = ceil(((float)(i+1)) / ((float)box->textDim[0])) * box->textDim[0];
+				while (i < nextI) {
+					CySetCodepoint(box, i++, 0x20);
+				}
+				--i;
+			}
+
+			// Tab handling
+			else if (chunkSlot.codepoint == 0x09) {
+				if (rowI % 5 == 0) {
+					CySetCodepoint(box, i++, 0x20);
+					rowI++;
+				}
+				while (rowI % 5 != 0) {
+					CySetCodepoint(box, i++, 0x20);
+					rowI++;
+				}
+				i--;
+			}
+
+			// Normal handling
+			else {
+				// Set corresponding chunked file codepoint
+				CySetCodepoint(box, i, chunkSlot.codepoint);
+			}
 
 			// Get next chunked file codepoint
 			moreCodepoints = CyGetNextSlotInChunkedFile(&chunkSlot);
+			// If this is where the cursor is, update accordingly
+			if (CyIsSlotAtCursor(&box->file, &chunkSlot)) {
+				CySetDefaultCursor(box, (i+1) % box->textDim[0], (i+1) / box->textDim[0]);
+			}
 		}
 
 		// Refill texture buffer

@@ -61,6 +61,40 @@
 		}
 	}
 
+	// Moves slot to farthest left empty slot
+	// Very similar to CyShiftLeft
+	void CyShiftSlotLeft(CyChunkedFile* file, CyChunkSlot* slot) {
+		while (MU_TRUE) {
+			// If we've gone as far left as possible, just exit
+			if (!slot->chunk->prev && slot->index == 0) {
+				return;
+			}
+
+			// If we've gone as far left as possible in this chunk, wrap
+			if (slot->index == 0) {
+				slot->chunk = slot->chunk->prev;
+				slot->index = FILE_CHUNK_CODEPOINTS-1;
+			}
+
+			// If not, simply decrement cursorIndex
+			else {
+				--slot->index;
+			}
+
+			// If this codepoint is not 0, move right once and we're good
+			if (slot->chunk->data[slot->index] != 0) {
+				if (slot->index == FILE_CHUNK_CODEPOINTS-1) {
+					slot->chunk = slot->chunk->next;
+					slot->index = 0;
+				}
+				else {
+					++slot->index;
+				}
+				return;
+			}
+		}
+	}
+
 	// Pushes data starting from the cursor and past to a new chunk rightwards
 	muBool CyPushRight(CyChunkedFile* file) {
 		// Allocate new chunk
@@ -487,5 +521,24 @@
 		}
 
 		return MU_FALSE;
+	}
+
+	// Returns whether or not a given slot is at the cursor
+	muBool CyIsSlotAtCursor(CyChunkedFile* file, CyChunkSlot* slot) {
+		// First, simply check if they're equal to each other
+		if (file->cursorChunk == slot->chunk && file->cursorIndex == slot->index) {
+			return MU_TRUE;
+		}
+		// If not, if both don't equal empty, they surely aren't in the same slot
+		if (file->cursorChunk->data[file->cursorIndex] != 0 || slot->chunk->data[slot->index] != 0) {
+			return MU_FALSE;
+		}
+
+		// Move cursor and slot as far left in empty
+		CyShiftLeft(file);
+		CyShiftSlotLeft(file, slot);
+
+		// Return if they equal each other now
+		return file->cursorChunk == slot->chunk && file->cursorIndex == slot->index;
 	}
 

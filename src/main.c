@@ -54,10 +54,12 @@ void keyInputCallback(muWindow win, muKeyboardKey key, muBool status) {
 	if (key == MU_KEYBOARD_LEFT) {
 		CyLog("Leftward movement detected; moving cursor.\n");
 		CyMoveLeftInChunkedFile(&box.file, 1);
+		shouldUpdate = MU_TRUE;
 	}
 	else if (key == MU_KEYBOARD_RIGHT) {
 		CyLog("Rightward movement detected; moving cursor.\n");
 		CyMoveRightInChunkedFile(&box.file, 1);
+		shouldUpdate = MU_TRUE;
 	}
 	else if (key == MU_KEYBOARD_INSERT) {
 		shouldInsert = !shouldInsert;

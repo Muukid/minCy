@@ -68,3 +68,6 @@ muBool CyGetFirstSlotInChunkedFile(CyChunkedFile* file, CyChunkSlot* slot);
 // Returns false if no slot
 muBool CyGetNextSlotInChunkedFile(CyChunkSlot* slot);
 
+// Returns whether or not a given slot is at the cursor
+muBool CyIsSlotAtCursor(CyChunkedFile* file, CyChunkSlot* slot);
+

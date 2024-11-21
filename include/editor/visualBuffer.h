@@ -37,6 +37,11 @@ struct CyEditorBox {
 	mugRect* colRects;
 	mugObjects colRectBuf;
 
+	// Cursor info
+	uint32_m cursorWidth;
+	mugRect cursorRect;
+	mugObjects cursorRectBuf;
+
 	// Individual slot info
 	CyEditorBoxSlot* slots;
 };
